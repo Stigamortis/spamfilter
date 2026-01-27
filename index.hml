@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TensorFlow.js Spam Filter</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f);
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1000px;
+            width: 100%;
+            background-color: rgba(255, 255, 255, 0.97);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            margin: 20px auto;
+        }
+        
+        header {
+            background: linear-gradient(to right, #b21f1f, #fd746c);
+            color: white;
+            padding: 25px 30px;
+            text-align: center;
+            border-bottom: 5px solid #8b0000;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .main-content {
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+        
+        .input-section {
+            background-color: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            border-left: 5px solid #b21f1f;
+        }
+        
+        .input-section h2 {
+            color: #b21f1f;
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 150px;
+            padding: 20px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            resize: vertical;
+            transition: border 0.3s;
+            line-height: 1.5;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #b21f1f;
+            box-shadow: 0 0 0 3px rgba(178, 31, 31, 0.2);
+        }
+        
+        .button-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+            gap: 15px;
+        }
+        
+        button {
+            padding: 14px 32px;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        #analyzeBtn {
+            background: linear-gradient(to right, #b21f1f, #fd746c);
+            box-shadow: 0 5px 15px rgba(178, 31, 31, 0.4);
+        }
+        
+        #analyzeBtn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(178, 31, 31, 0.6);
+        }
+        
+        #clearBtn {
+            background: linear-gradient(to right, #4b6cb7, #182848);
+            box-shadow: 0 5px 15px rgba(75, 108, 183, 0.4);
+        }
+        
+        #clearBtn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(75, 108, 183, 0.6);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .results-section {
+            background-color: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            border-left: 5px solid #4b6cb7;
+        }
+        
+        .results-section h2 {
+            color: #4b6cb7;
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .results-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            margin-top: 15px;
+        }
+        
+        .result-box {
+            flex: 1;
+            min-width: 300px;
+            padding: 25px;
+            border-radius: 15px;
+            background-color: white;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        }
+        
+        .spam-result {
+            border-top: 5px solid #b21f1f;
+        }
+        
+        .tokens-result {
+            border-top: 5px solid #4b6cb7;
+        }
+        
+        .result-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .spam-indicator {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 15px;
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+        }
+        
+        .spam-probability {
+            font-size: 4rem;
+            font-weight: 800;
+            margin-bottom: 10px;
+            background: linear-gradient(to right, #b21f1f, #fd746c);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .spam-label {
+            font-size: 1.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .probability-bar {
+            width: 100%;
+            height: 30px;
+            background-color: #e9ecef;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-top: 20px;
+            position: relative;
+        }
+        
+        .probability-fill {
+            height: 100%;
+            background: linear-gradient(to right, #4b6cb7, #b21f1f);
+            border-radius: 15px;
+            transition: width 1s ease;
+            position: relative;
+        }
+        
+        .probability-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #666;
+        }
+        
+        .tokens-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 5px;
+        }
+        
+        .token {
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .ham-token {
+            background-color: #e3f2fd;
+            color: #1565c0;
+            border: 1px solid #bbdefb;
+        }
+        
+        .spam-token {
+            background-color: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+        
+        .token-index {
+            font-size: 0.75rem;
+            opacity: 0.7;
+            font-weight: 600;
+        }
+        
+        .token-count {
+            margin-top: 15px;
+            font-size: 0.9rem;
+            color: #666;
+            text-align: center;
+        }
+        
+        .status-section {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            margin-top: 10px;
+            border-left: 5px solid #28a745;
+        }
+        
+        .status-section h2 {
+            color: #28a745;
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        #status {
+            padding: 15px;
+            background-color: #fff;
+            border-radius: 10px;
+            font-size: 1rem;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            border: 1px solid #e9ecef;
+        }
+        
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(178, 31, 31, 0.3);
+            border-radius: 50%;
+            border-top-color: #b21f1f;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .model-info {
+            background-color: #e3f2fd;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            border-left: 5px solid #1a2a6c;
+        }
+        
+        .model-info h3 {
+            color: #1a2a6c;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .model-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .model-detail {
+            background-color: white;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+        
+        .detail-label {
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .detail-value {
+            color: #1a2a6c;
+            font-weight: 700;
+        }
+        
+        footer {
+            margin-top: 20px;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 0.9rem;
+            padding: 20px;
+            max-width: 1000px;
+        }
+        
+        .examples {
+            margin-top: 15px;
+            background-color: #fff3cd;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 5px solid #ffc107;
+        }
+        
+        .examples h4 {
+            color: #856404;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .example-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .example-btn {
+            padding: 8px 16px;
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .example-btn:hover {
+            background-color: #e9ecef;
+            transform: translateY(-2px);
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 15px;
+            }
+            
+            .main-content {
+                padding: 20px;
+            }
+            
+            .result-box {
+                min-width: 100%;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .spam-probability {
+                font-size: 3rem;
+            }
+            
+            .button-container {
+                flex-direction: column;
+            }
+            
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 TensorFlow.js Spam Filter</h1>
+            <div class="subtitle">Analysera meddelanden för att upptäcka spam med en neural nätverksmodell</div>
+        </header>
+        
+        <div class="main-content">
+            <div class="model-info">
+                <h3>📊 Spam Filter Modellinformation</h3>
+                <p>Denna modell är tränad för att identifiera spam meddelanden med hjälp av en neural nätverksarkitektur:</p>
+                <div class="model-details">
+                    <div class="model-detail"><span class="detail-label">Vocab Size:</span> <span class="detail-value">8000 ord</span></div>
+                    <div class="model-detail"><span class="detail-label">Embedding Dim:</span> <span class="detail-value">64 dimensioner</span></div>
+                    <div class="model-detail"><span class="detail-label">Max Length:</span> <span class="detail-value">30 tokens</span></div>
+                    <div class="model-detail"><span class="detail-label">Arkitektur:</span> <span class="detail-value">Embedding → GlobalAvgPool → Dense(32) → Dropout → Dense(1)</span></div>
+                </div>
+            </div>
+            
+            <div class="input-section">
+                <h2>📝 Testa Spamfiltret</h2>
+                <p>Skriv eller klistra in ett meddelande för att kontrollera om det är spam eller inte:</p>
+                <textarea id="inputText" placeholder="Skriv eller klistra in ditt meddelande här..."></textarea>
+                
+                <div class="examples">
+                    <h4>💡 Testexempel (klicka för att testa):</h4>
+                    <div class="example-buttons">
+                        <button class="example-btn" data-example="Win a free iPhone now! Click here for your prize!">Spam exempel</button>
+                        <button class="example-btn" data-example="Hi, are we still meeting tomorrow at 3pm? Let me know.">Ham exempel</button>
+                        <button class="example-btn" data-example="URGENT! You have won $1,000,000! Claim your prize immediately!!!">Uppseendeväckande spam</button>
+                        <button class="example-btn" data-example="Hey, did you get my email about the project deadline?">Normalt meddelande</button>
+                    </div>
+                </div>
+                
+                <div class="button-container">
+                    <button id="analyzeBtn">
+                        <span>🔍</span> Analysera för Spam
+                    </button>
+                    <button id="clearBtn">
+                        <span>🗑️</span> Rensa Allt
+                    </button>
+                </div>
+            </div>
+            
+            <div class="results-section">
+                <h2>📊 Analysresultat</h2>
+                <div class="results-container">
+                    <div class="result-box spam-result">
+                        <div class="result-title">
+                            <span>⚠️</span> Spam Sannolikhet
+                        </div>
+                        
+                        <div class="spam-indicator">
+                            <div class="spam-probability" id="spamProbability">0%</div>
+                            <div class="spam-label" id="spamLabel">INGEN SPAM</div>
+                        </div>
+                        
+                        <div class="probability-bar">
+                            <div class="probability-fill" id="probabilityBar" style="width: 0%"></div>
+                        </div>
+                        
+                        <div class="probability-labels">
+                            <span>0% (Ingen spam)</span>
+                            <span>50%</span>
+                            <span>100% (Spam)</span>
+                        </div>
+                        
+                        <div style="margin-top: 20px; text-align: center;">
+                            <div style="font-size: 1.1rem; margin-bottom: 10px;">
+                                <strong>Bedömning:</strong> <span id="verdict">Meddelandet verkar säkert</span>
+                            </div>
+                            <div style="font-size: 0.9rem; color: #666;">
+                                <span id="confidenceText">Modellen är inte säker än - analysera ett meddelande</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="result-box tokens-result">
+                        <div class="result-title">
+                            <span>🔤</span> Tokeniserade Ord
+                        </div>
+                        <p>Orden från meddelandet omvandlade till tokens för analys:</p>
+                        <div class="tokens-container" id="tokensContainer">
+                            <div class="token ham-token">Inget meddelande analyserat än</div>
+                        </div>
+                        <div class="token-count">
+                            Totalt: <span id="tokenCount">0</span> ord | Spam-indikatorer: <span id="spamTokenCount">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="status-section">
+                <h2>🔄 Status</h2>
+                <div id="status">Spamfiltret är klart. Skriv eller klistra in ett meddelande för att analysera.</div>
+            </div>
+        </div>
+    </div>
+    
+    <footer>
+        <p>TensorFlow.js Spam Filter Modell | Laddas upp på GitHub</p>
+        <p>Modell: Embedding(8000,64) → GlobalAveragePooling1D → Dense(32, ReLU) → Dropout(0.2) → Dense(1, Sigmoid)</p>
+    </footer>
+
+    <script>
+        // Globala variabler
+        let model = null;
+        const VOCAB_SIZE = 8000;
+        const MAX_LEN = 30;
+        
+        // Spam-nyckelord för visuell indikering
+        const SPAM_KEYWORDS = [
+            "win", "free", "prize", "cash", "money", "urgent", "click", "winner", 
+            "congratulations", "selected", "claim", "offer", "limited", "guaranteed",
+            "risk-free", "million", "dollars", "€", "$", "!!!", "click here",
+            "buy now", "act now", "limited time", "special promotion", "viagra",
+            "casino", "lottery", "credit card", "password", "account", "verify"
+        ];
+        
+        // DOM-element
+        const inputText = document.getElementById('inputText');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const spamProbability = document.getElementById('spamProbability');
+        const spamLabel = document.getElementById('spamLabel');
+        const probabilityBar = document.getElementById('probabilityBar');
+        const tokensContainer = document.getElementById('tokensContainer');
+        const status = document.getElementById('status');
+        const tokenCount = document.getElementById('tokenCount');
+        const spamTokenCount = document.getElementById('spamTokenCount');
+        const verdict = document.getElementById('verdict');
+        const confidenceText = document.getElementById('confidenceText');
+        const exampleButtons = document.querySelectorAll('.example-btn');
+        
+        // Enkel ordbok för spamfilter (förenklad för demonstration)
+        const spamVocabulary = {
+            // Spam-relaterade ord med högre token-ID
+            "win": 100, "free": 101, "prize": 102, "cash": 103, "money": 104,
+            "urgent": 105, "click": 106, "winner": 107, "congratulations": 108,
+            "selected": 109, "claim": 110, "offer": 111, "limited": 112,
+            "guaranteed": 113, "million": 114, "dollars": 115, "buy": 116,
+            "now": 117, "act": 118, "time": 119, "special": 120, "promotion": 121,
+            "viagra": 122, "casino": 123, "lottery": 124, "credit": 125,
+            "card": 126, "password": 127, "account": 128, "verify": 129,
+            
+            // Normala ord med lägre token-ID
+            "hello": 10, "hi": 11, "meeting": 12, "tomorrow": 13, "project": 14,
+            "email": 15, "work": 16, "home": 17, "family": 18, "friend": 19,
+            "lunch": 20, "dinner": 21, "coffee": 22, "thanks": 23, "please": 24,
+            "sorry": 25, "help": 26, "question": 27, "answer": 28, "information": 29,
+            "the": 1, "and": 2, "you": 3, "for": 4, "are": 5, "this": 6,
+            "have": 7, "with": 8, "that": 9, "from": 30, "your": 31, "will": 32
+        };
+        
+        // Funktion för att ladda modellen
+        async function loadModel() {
+            try {
+                updateStatus('Laddar spamfilter-modellen...', true);
+                
+                // Försök ladda modellen från model.json-filen
+                model = await tf.loadLayersModel('model.json');
+                
+                updateStatus('Spamfilter-modellen har laddats! Testa med ett meddelande.');
+                analyzeBtn.disabled = false;
+                console.log('Spamfilter-modell laddad:', model);
+            } catch (error) {
+                console.error('Fel vid laddning av spamfilter-modell:', error);
+                updateStatus('Fel vid laddning av modell. Skapar en testmodell för spamfilter...', true);
+                
+                // Skapa en testmodell med samma arkitektur för demonstration
+                model = createSpamModel();
+                updateStatus('Testmodell för spamfilter skapad! Du kan nu testa med egna meddelanden.');
+                analyzeBtn.disabled = false;
+            }
+        }
+        
+        // Skapa en testmodell för spamfilter
+        function createSpamModel() {
+            const testModel = tf.sequential();
+            
+            // Embedding-lagret
+            testModel.add(tf.layers.embedding({
+                inputDim: VOCAB_SIZE,
+                outputDim: 64,
+                inputLength: MAX_LEN
+            }));
+            
+            // GlobalAveragePooling1D
+            testModel.add(tf.layers.globalAveragePooling1d());
+            
+            // Dense-lagret med 32 neuroner och ReLU-aktivering
+            testModel.add(tf.layers.dense({
+                units: 32,
+                activation: 'relu'
+            }));
+            
+            // Dropout-lagret
+            testModel.add(tf.layers.dropout({rate: 0.2}));
+            
+            // Slutligt Dense-lager med 1 neuron och sigmoid-aktivering
+            testModel.add(tf.layers.dense({
+                units: 1,
+                activation: 'sigmoid'
+            }));
+            
+            // Kompilera modellen
+            testModel.compile({
+                optimizer: tf.train.adam(0.001),
+                loss: 'binaryCrossentropy',
+                metrics: ['accuracy']
+            });
+            
+            return testModel;
+        }
+        
+        // Tokenisera text för spamfilter
+        function tokenizeForSpam(text) {
+            // Konvertera till små bokstäver
+            const lowerText = text.toLowerCase();
+            
+            // Extrahera ord (inkluderar siffror och bindestreck)
+            const words = lowerText
+                .replace(/[^\w\s\-]/g, ' ')  // Ta bort specialtecken förutom bindestreck
+                .split(/\s+/)                // Dela på mellanslag
+                .filter(word => word.length > 0);  // Ta bort tomma strängar
+            
+            // Skapa tokens med spam-indikator
+            const tokens = words.map(word => {
+                const isSpamKeyword = SPAM_KEYWORDS.some(keyword => 
+                    word.includes(keyword.toLowerCase()) || keyword.toLowerCase().includes(word)
+                );
+                
+                // Kontrollera om ordet finns i ordboken
+                if (spamVocabulary[word] !== undefined) {
+                    return {
+                        word: word,
+                        tokenId: spamVocabulary[word],
+                        isSpamIndicator: isSpamKeyword,
+                        inVocab: true
+                    };
+                } else {
+                    // Generera ett hash-baserat token-ID
+                    let hash = 0;
+                    for (let i = 0; i < word.length; i++) {
+                        hash = (hash * 31 + word.charCodeAt(i)) % VOCAB_SIZE;
+                    }
+                    return {
+                        word: word,
+                        tokenId: hash + 1000, // Starta från 1000 för okända ord
+                        isSpamIndicator: isSpamKeyword,
+                        inVocab: false
+                    };
+                }
+            });
+            
+            return tokens;
+        }
+        
+        // Förbered indata för modellen
+        function prepareInput(tokens) {
+            // Skapa en array med token-ID:n
+            const tokenIds = tokens.map(token => token.tokenId);
+            
+            // Begränsa till MAX_LEN tokens och fyll med 0 om för kort
+            const paddedTokens = [];
+            for (let i = 0; i < MAX_LEN; i++) {
+                paddedTokens.push(i < tokenIds.length ? tokenIds[i] : 0);
+            }
+            
+            // Skapa en tensor
+            return tf.tensor2d([paddedTokens], [1, MAX_LEN], 'int32');
+        }
+        
+        // Analysera meddelande för spam
+        async function analyzeForSpam() {
+            const text = inputText.value.trim();
+            
+            if (!text) {
+                updateStatus('Vänligen skriv eller klistra in ett meddelande för att analysera.');
+                return;
+            }
+            
+            if (!model) {
+                updateStatus('Spamfilter-modellen laddas fortfarande. Vänta ett ögonblick.');
+                return;
+            }
+            
+            updateStatus('Analyserar meddelande för spam...', true);
+            analyzeBtn.disabled = true;
+            
+            try {
+                // Tokenisera texten
+                const tokens = tokenizeForSpam(text);
+                
+                // Visa tokens och räkna spam-indikatorer
+                displayTokens(tokens);
+                
+                // Förbered indata för modellen
+                const inputTensor = prepareInput(tokens);
+                
+                // Gör förutsägelse
+                const prediction = model.predict(inputTensor);
+                const spamProb = (await prediction.data())[0];
+                
+                // Visa resultatet
+                displaySpamResult(spamProb, tokens);
+                
+                // Rensa tensorer
+                inputTensor.dispose();
+                prediction.dispose();
+                
+                updateStatus(`Analys klar! Spamsannolikhet: ${(spamProb * 100).toFixed(1)}%`);
+            } catch (error) {
+                console.error('Fel vid spam-analys:', error);
+                updateStatus('Ett fel uppstod vid analysen. Försök igen.');
+                
+                // För demonstration: visa ett slumpmässigt resultat om modellen inte fungerar
+                if (model && model.layers && model.layers.length > 0) {
+                    const mockProbability = Math.random();
+                    const mockTokens = tokenizeForSpam(text);
+                    displaySpamResult(mockProbability, mockTokens);
+                    updateStatus(`Demonstrationsresultat: ${(mockProbability * 100).toFixed(1)}% spamsannolikhet (testdata)`);
+                }
+            } finally {
+                analyzeBtn.disabled = false;
+            }
+        }
+        
+        // Visa tokens med spam-indikering
+        function displayTokens(tokens) {
+            tokensContainer.innerHTML = '';
+            
+            if (tokens.length === 0) {
+                tokensContainer.innerHTML = '<div class="token ham-token">Inga ord identifierade</div>';
+                tokenCount.textContent = '0';
+                spamTokenCount.textContent = '0';
+                return;
+            }
+            
+            let spamIndicatorCount = 0;
+            
+            tokens.forEach(token => {
+                const tokenElement = document.createElement('div');
+                
+                // Bestäm klass baserat på om det är ett spam-indikerande ord
+                if (token.isSpamIndicator) {
+                    tokenElement.className = 'token spam-token';
+                    spamIndicatorCount++;
+                } else {
+                    tokenElement.className = 'token ham-token';
+                }
+                
+                tokenElement.innerHTML = `
+                    ${token.word}
+                    <span class="token-index">${token.tokenId}</span>
+                `;
+                
+                tokensContainer.appendChild(tokenElement);
+            });
+            
+            tokenCount.textContent = tokens.length;
+            spamTokenCount.textContent = spamIndicatorCount;
+        }
+        
+        // Visa spamresultat
+        function displaySpamResult(probability, tokens) {
+            // Konvertera till procent
+            const percentage = (probability * 100).toFixed(1);
+            spamProbability.textContent = `${percentage}%`;
+            
+            // Uppdatera etiketten baserat på sannolikhet
+            let label, labelColor, verdictText, confidenceLevel;
+            
+            if (probability < 0.2) {
+                label = "INGEN SPAM";
+                labelColor = "#28a745";
+                verdictText = "Meddelandet verkar säkert och är troligen inte spam";
+                confidenceLevel = "Hög säkerhet";
+            } else if (probability < 0.5) {
+                label = "TROLIGEN INTE SPAM";
+                labelColor = "#ffc107";
+                verdictText = "Meddelandet kan vara legitimt men innehåller varningstecken";
+                confidenceLevel = "Måttlig säkerhet";
+            } else if (probability < 0.8) {
+                label = "MÖJLIG SPAM";
+                labelColor = "#fd7e14";
+                verdictText = "Meddelandet kan vara spam - var försiktig";
+                confidenceLevel = "Låg säkerhet";
+            } else {
+                label = "SPAM";
+                labelColor = "#dc3545";
+                verdictText = "Meddelandet är troligen spam - rekommenderas att ignorera";
+                confidenceLevel = "Mycket hög säkerhet";
+            }
+            
+            // Anpassa gradient baserat på sannolikhet
+            let gradientColor;
+            if (probability < 0.5) {
+                gradientColor = `linear-gradient(to right, #4b6cb7 0%, #4b6cb7 ${percentage}%, #f8f9fa ${percentage}%, #f8f9fa 100%)`;
+            } else {
+                gradientColor = `linear-gradient(to right, #4b6cb7 0%, #b21f1f ${percentage}%, #b21f1f 100%)`;
+            }
+            
+            // Uppdatera UI-element
+            spamLabel.textContent = label;
+            spamLabel.style.color = labelColor;
+            spamProbability.style.background = `linear-gradient(to right, ${labelColor}, ${labelColor}99)`;
+            spamProbability.style.webkitBackgroundClip = 'text';
+            spamProbability.style.backgroundClip = 'text';
+            verdict.textContent = verdictText;
+            confidenceText.textContent = `Säkerhetsnivå: ${confidenceLevel} | Spam-indikatorer: ${tokens.filter(t => t.isSpamIndicator).length}`;
+            
+            // Animerar stapeln
+            setTimeout(() => {
+                probabilityBar.style.width = `${percentage}%`;
+                probabilityBar.style.background = gradientColor;
+            }, 100);
+        }
+        
+        // Uppdatera statusmeddelande
+        function updateStatus(message, loading = false) {
+            if (loading) {
+                status.innerHTML = `
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <span>${message}</span>
+                    </div>
+                `;
+            } else {
+                status.textContent = message;
+            }
+        }
+        
+        // Rensa allt
+        function clearAll() {
+            inputText.value = '';
+            spamProbability.textContent = '0%';
+            spamLabel.textContent = 'INGEN SPAM';
+            spamLabel.style.color = '#28a745';
+            probabilityBar.style.width = '0%';
+            probabilityBar.style.background = 'linear-gradient(to right, #4b6cb7, #b21f1f)';
+            tokensContainer.innerHTML = '<div class="token ham-token">Inget meddelande analyserat än</div>';
+            tokenCount.textContent = '0';
+            spamTokenCount.textContent = '0';
+            verdict.textContent = 'Meddelandet verkar säkert';
+            confidenceText.textContent = 'Modellen är inte säker än - analysera ett meddelande';
+            updateStatus('Spamfiltret är klart. Skriv eller klistra in ett meddelande för att analysera.');
+        }
+        
+        // Lägg till exempelmeddelanden
+        function setupExamples() {
+            exampleButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const exampleText = btn.getAttribute('data-example');
+                    inputText.value = exampleText;
+                    
+                    // Skrolla till textområdet
+                    inputText.focus();
+                    
+                    // Uppdatera status
+                    updateStatus(`Exempel inmatat: "${exampleText.substring(0, 50)}${exampleText.length > 50 ? '...' : ''}"`);
+                });
+            });
+        }
+        
+        // Initiera sidan
+        document.addEventListener('DOMContentLoaded', () => {
+            // Ladda modellen
+            loadModel();
+            
+            // Konfigurera exempelknappar
+            setupExamples();
+            
+            // Lägg till händelsehanterare
+            analyzeBtn.addEventListener('click', analyzeForSpam);
+            clearBtn.addEventListener('click', clearAll);
+            
+            // Analysera med Enter-tangenten (Shift+Enter för ny rad)
+            inputText.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    analyzeForSpam();
+                }
+            });
+            
+            // Visa standardexempel i placeholder
+            const examples = [
+                "Win a free iPhone now! Click here to claim your prize!!!",
+                "Hi John, are we still meeting tomorrow at 3pm
