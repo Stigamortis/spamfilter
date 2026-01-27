@@ -1,63 +1,71 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Text Classification Demo</title>
+  <meta charset="UTF-8" />
+  <title>TensorFlow.js Text Classifier</title>
 
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0"></script>
+  <!-- TensorFlow.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
 
   <style>
     body {
       font-family: Arial, sans-serif;
       max-width: 800px;
       margin: 40px auto;
-      line-height: 1.6;
     }
     textarea {
       width: 100%;
-      height: 100px;
+      height: 80px;
       font-size: 16px;
     }
     button {
       padding: 10px 20px;
-      font-size: 16px;
       margin-top: 10px;
+      font-size: 16px;
+      cursor: pointer;
     }
-    .box {
+    pre {
       background: #f4f4f4;
-      padding: 15px;
-      margin-top: 20px;
-      border-radius: 6px;
+      padding: 10px;
+      overflow-x: auto;
     }
-    .prob {
-      font-size: 22px;
-      font-weight: bold;
+    .result {
+      font-size: 18px;
+      margin-top: 15px;
     }
   </style>
 </head>
 <body>
 
-<h1>TensorFlow.js – Text Model Test</h1>
+<h1>TensorFlow.js Text Model Demo</h1>
 
-<p>Enter an English sentence and run the model:</p>
+<p>Enter an English sentence and run the model.</p>
 
-<textarea id="textInput" placeholder="Type an English sentence here..."></textarea>
+<textarea id="inputText" placeholder="Type an English sentence here..."></textarea>
 <br>
-<button onclick="runPrediction()">Predict</button>
+<button onclick="runModel()">Predict</button>
 
-<div id="output" class="box"></div>
+<div class="result" id="prediction"></div>
+
+<h3>Tokens (word → index)</h3>
+<pre id="tokens"></pre>
 
 <script>
   let model;
+
   const MAX_LEN = 30;
   const VOCAB_SIZE = 8000;
 
-  async function loadModel() {
-    model = await tf.loadLayersModel("model/model.json");
-    console.log("Model loaded");
+  // Simple deterministic tokenizer (hash-based)
+  function wordToIndex(word) {
+    let hash = 0;
+    for (let i = 0; i < word.length; i++) {
+      hash = ((hash << 5) - hash) + word.charCodeAt(i);
+      hash |= 0;
+    }
+    return Math.abs(hash) % VOCAB_SIZE;
   }
 
-  // Simple deterministic tokenizer (fallback)
   function tokenize(text) {
     const words = text
       .toLowerCase()
@@ -65,47 +73,45 @@
       .split(/\s+/)
       .filter(w => w.length > 0);
 
-    const tokens = words.map(w => {
-      let hash = 0;
-      for (let i = 0; i < w.length; i++) {
-        hash = (hash << 5) - hash + w.charCodeAt(i);
-        hash |= 0;
-      }
-      return Math.abs(hash) % VOCAB_SIZE;
-    });
+    const tokens = words.map(w => wordToIndex(w));
 
-    // pad / truncate
+    // Pad / truncate to length 30
     while (tokens.length < MAX_LEN) tokens.push(0);
     return tokens.slice(0, MAX_LEN);
   }
 
-  async function runPrediction() {
-    if (!model) return;
+  async function loadModel() {
+    model = await tf.loadLayersModel("model.json");
+    console.log("Model loaded");
+  }
 
-    const text = document.getElementById("textInput").value;
+  async function runModel() {
+    if (!model) {
+      alert("Model not loaded yet");
+      return;
+    }
+
+    const text = document.getElementById("inputText").value;
     if (!text.trim()) return;
 
     const tokens = tokenize(text);
+
     const inputTensor = tf.tensor2d([tokens], [1, MAX_LEN], "int32");
-
     const prediction = model.predict(inputTensor);
-    const prob = (await prediction.data())[0];
+    const value = (await prediction.data())[0];
 
-    const words = text.split(/\s+/);
+    document.getElementById("prediction").innerHTML =
+      `<strong>Prediction probability:</strong> ${value.toFixed(4)}<br>
+       <strong>Class:</strong> ${value >= 0.5 ? "Positive" : "Negative"}`;
 
-    let tokenView = words.map(w => {
-      const t = tokenize(w)[0];
-      return `${w} → ${t}`;
-    }).join("<br>");
+    const words = text
+      .toLowerCase()
+      .replace(/[^a-z\s]/g, "")
+      .split(/\s+/)
+      .filter(w => w.length > 0);
 
-    document.getElementById("output").innerHTML = `
-      <div class="prob">Probability: ${(prob * 100).toFixed(2)}%</div>
-      <p><strong>Model interpretation:</strong><br>
-      ${prob >= 0.5 ? "Positive class" : "Negative class"}</p>
-      <hr>
-      <p><strong>Tokens:</strong></p>
-      ${tokenView}
-    `;
+    const tokenMap = words.map(w => `${w} → ${wordToIndex(w)}`).join("\n");
+    document.getElementById("tokens").textContent = tokenMap;
 
     tf.dispose([inputTensor, prediction]);
   }
