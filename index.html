@@ -3,147 +3,114 @@
 <head>
   <meta charset="UTF-8">
   <title>Text Classification Demo</title>
+
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0"></script>
 
   <style>
     body {
       font-family: Arial, sans-serif;
-      max-width: 700px;
-      margin: auto;
+      max-width: 800px;
+      margin: 40px auto;
+      line-height: 1.6;
     }
     textarea {
       width: 100%;
+      height: 100px;
       font-size: 16px;
     }
-    .token {
-      display: inline-block;
-      margin: 4px;
-      padding: 4px 6px;
-      border-radius: 4px;
-      background: #eee;
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-top: 10px;
     }
-    .oov {
-      background: #ffcccc;
+    .box {
+      background: #f4f4f4;
+      padding: 15px;
+      margin-top: 20px;
+      border-radius: 6px;
     }
     .prob {
-      font-size: 1.3em;
+      font-size: 22px;
       font-weight: bold;
     }
   </style>
 </head>
 <body>
 
-<h2>Text Classification</h2>
+<h1>TensorFlow.js – Text Model Test</h1>
 
-<textarea id="inputText" rows="4"
-  placeholder="Type an English sentence..."></textarea>
-<br><br>
-<button onclick="predict()">Predict</button>
+<p>Enter an English sentence and run the model:</p>
 
-<h3>Prediction</h3>
-<p id="probability">–</p>
+<textarea id="textInput" placeholder="Type an English sentence here..."></textarea>
+<br>
+<button onclick="runPrediction()">Predict</button>
 
-<h3>Tokens</h3>
-<div id="tokens"></div>
+<div id="output" class="box"></div>
 
 <script>
-/* ================================
-   TOKENIZER (EXEMPEL – BYT MOT DIN)
-   ================================ */
+  let model;
+  const MAX_LEN = 30;
+  const VOCAB_SIZE = 8000;
 
-const wordIndex = {
-  "<OOV>": 1,
-  "the": 2,
-  "movie": 3,
-  "was": 4,
-  "great": 5,
-  "bad": 6,
-  "not": 7,
-  "very": 8,
-  "good": 9
-};
-
-/* ================================
-   KONSTANTER (MATCHAR MODELLEN)
-   ================================ */
-
-const MAX_LEN = 30;
-const OOV_TOKEN = 1;
-
-let model;
-
-/* ================================
-   LÄS IN MODELL
-   ================================ */
-
-async function loadModel() {
-  model = await tf.loadLayersModel("model/model.json");
-  console.log("Model loaded");
-}
-loadModel();
-
-/* ================================
-   TEXT → TOKENS
-   ================================ */
-
-function tokenize(text) {
-  const words = text
-    .toLowerCase()
-    .replace(/[^a-z\s]/g, "")
-    .split(/\s+/)
-    .filter(w => w.length > 0);
-
-  let tokens = words.map(w => wordIndex[w] || OOV_TOKEN);
-
-  if (tokens.length > MAX_LEN) {
-    tokens = tokens.slice(0, MAX_LEN);
-  }
-  while (tokens.length < MAX_LEN) {
-    tokens.push(0);
+  async function loadModel() {
+    model = await tf.loadLayersModel("model/model.json");
+    console.log("Model loaded");
   }
 
-  return { words, tokens };
-}
+  // Simple deterministic tokenizer (fallback)
+  function tokenize(text) {
+    const words = text
+      .toLowerCase()
+      .replace(/[^a-z\s]/g, "")
+      .split(/\s+/)
+      .filter(w => w.length > 0);
 
-/* ================================
-   PREDICTION + UI
-   ================================ */
+    const tokens = words.map(w => {
+      let hash = 0;
+      for (let i = 0; i < w.length; i++) {
+        hash = (hash << 5) - hash + w.charCodeAt(i);
+        hash |= 0;
+      }
+      return Math.abs(hash) % VOCAB_SIZE;
+    });
 
-async function predict() {
-  if (!model) {
-    alert("Model not loaded yet");
-    return;
+    // pad / truncate
+    while (tokens.length < MAX_LEN) tokens.push(0);
+    return tokens.slice(0, MAX_LEN);
   }
 
-  const text = document.getElementById("inputText").value;
-  if (!text) return;
+  async function runPrediction() {
+    if (!model) return;
 
-  const { words, tokens } = tokenize(text);
+    const text = document.getElementById("textInput").value;
+    if (!text.trim()) return;
 
-  /* Visa tokens */
-  const tokenDiv = document.getElementById("tokens");
-  tokenDiv.innerHTML = "";
+    const tokens = tokenize(text);
+    const inputTensor = tf.tensor2d([tokens], [1, MAX_LEN], "int32");
 
-  words.forEach((w, i) => {
-    const span = document.createElement("span");
-    span.className = "token";
-    if (!wordIndex[w]) span.classList.add("oov");
-    span.textContent = `${w} → ${tokens[i]}`;
-    tokenDiv.appendChild(span);
-  });
+    const prediction = model.predict(inputTensor);
+    const prob = (await prediction.data())[0];
 
-  /* Tensor */
-  const inputTensor = tf.tensor2d([tokens], [1, MAX_LEN], "int32");
-  const prediction = model.predict(inputTensor);
-  const value = (await prediction.data())[0];
+    const words = text.split(/\s+/);
 
-  const percent = (value * 100).toFixed(2);
+    let tokenView = words.map(w => {
+      const t = tokenize(w)[0];
+      return `${w} → ${t}`;
+    }).join("<br>");
 
-  document.getElementById("probability").innerHTML =
-    `<span class="prob">Positive probability: ${percent}%</span>`;
+    document.getElementById("output").innerHTML = `
+      <div class="prob">Probability: ${(prob * 100).toFixed(2)}%</div>
+      <p><strong>Model interpretation:</strong><br>
+      ${prob >= 0.5 ? "Positive class" : "Negative class"}</p>
+      <hr>
+      <p><strong>Tokens:</strong></p>
+      ${tokenView}
+    `;
 
-  tf.dispose([inputTensor, prediction]);
-}
+    tf.dispose([inputTensor, prediction]);
+  }
+
+  loadModel();
 </script>
 
 </body>
