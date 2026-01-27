@@ -1,0 +1,18 @@
+function tokenize(text) {
+  const words = text
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, "")
+    .split(/\s+/);
+
+  const tokens = words.map(w => wordIndex[w] || OOV_TOKEN);
+
+  // padding / truncating
+  if (tokens.length > MAX_LEN) {
+    tokens.length = MAX_LEN;
+  }
+  while (tokens.length < MAX_LEN) {
+    tokens.push(0);
+  }
+
+  return { words, tokens };
+}
