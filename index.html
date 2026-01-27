@@ -1,1 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Text Classification Demo</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0"></script>
+  <style>
+    body { font-family: Arial; max-width: 600px; margin: auto; }
+    textarea { width: 100%; }
+    .token { background:#eee; padding:4px; margin:2px; display:inline-block; }
+  </style>
+</head>
+<body>
 
+<h2>Text Classification</h2>
+
+<textarea id="inputText" rows="4" placeholder="Type an English sentence..."></textarea>
+<br><br>
+<button onclick="predict()">Predict</button>
+
+<h3>Prediction</h3>
+<p id="probability">–</p>
+
+<h3>Tokens</h3>
+<div id="tokens"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
