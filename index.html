@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TensorFlow.js Text Classifier</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #3a7bd5);
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            width: 100%;
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            margin: 20px auto;
+        }
+        
+        header {
+            background: linear-gradient(to right, #3a7bd5, #00d2ff);
+            color: white;
+            padding: 25px 30px;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .main-content {
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+        
+        .input-section {
+            background-color: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+        
+        .input-section h2 {
+            color: #3a7bd5;
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 120px;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            resize: vertical;
+            transition: border 0.3s;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #3a7bd5;
+        }
+        
+        .button-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 15px;
+            gap: 15px;
+        }
+        
+        button {
+            padding: 14px 28px;
+            background: linear-gradient(to right, #3a7bd5, #00d2ff);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(58, 123, 213, 0.4);
+        }
+        
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(58, 123, 213, 0.6);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        #clearBtn {
+            background: linear-gradient(to right, #f46b45, #eea849);
+            box-shadow: 0 5px 15px rgba(244, 107, 69, 0.4);
+        }
+        
+        #clearBtn:hover:not(:disabled) {
+            box-shadow: 0 8px 20px rgba(244, 107, 69, 0.6);
+        }
+        
+        .results-section {
+            background-color: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+        
+        .results-section h2 {
+            color: #3a7bd5;
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+        }
+        
+        .results-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-top: 15px;
+        }
+        
+        .result-box {
+            flex: 1;
+            min-width: 300px;
+            padding: 20px;
+            border-radius: 10px;
+            background-color: white;
+            box-shadow: 0 5px 10px rgba(0, 0, 0, 0.08);
+        }
+        
+        .result-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .result-title i {
+            color: #3a7bd5;
+        }
+        
+        .probability-display {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 10px;
+        }
+        
+        .probability-value {
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: #3a7bd5;
+            margin-bottom: 10px;
+        }
+        
+        .probability-bar {
+            width: 100%;
+            height: 25px;
+            background-color: #e9ecef;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        
+        .probability-fill {
+            height: 100%;
+            background: linear-gradient(to right, #3a7bd5, #00d2ff);
+            border-radius: 12px;
+            transition: width 0.8s ease;
+        }
+        
+        .tokens-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .token {
+            padding: 8px 15px;
+            background-color: #e3f2fd;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #1565c0;
+        }
+        
+        .token-index {
+            font-size: 0.8rem;
+            color: #666;
+            margin-left: 5px;
+        }
+        
+        .status-section {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+            margin-top: 10px;
+        }
+        
+        .status-section h2 {
+            color: #3a7bd5;
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+        }
+        
+        #status {
+            padding: 15px;
+            background-color: #fff;
+            border-radius: 10px;
+            font-size: 1rem;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(58, 123, 213, 0.3);
+            border-radius: 50%;
+            border-top-color: #3a7bd5;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        footer {
+            margin-top: 20px;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9rem;
+            padding: 20px;
+        }
+        
+        .model-info {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 15px;
+            }
+            
+            .main-content {
+                padding: 20px;
+            }
+            
+            .result-box {
+                min-width: 100%;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>TensorFlow.js Text Classifier</h1>
+            <div class="subtitle">Analysera engelska meningar med en neural nätverksmodell</div>
+        </header>
+        
+        <div class="main-content">
+            <div class="model-info">
+                <strong>Modellinformation:</strong> Denna modell använder inbäddningslager (8000 ord, 64 dimensioner) följt av GlobalAveragePooling1D, Dense(32) med ReLU, Dropout(0.2) och en slutlig Dense(1) med Sigmoid-aktivering för binär klassificering.
+            </div>
+            
+            <div class="input-section">
+                <h2>Testa modellen</h2>
+                <p>Skriv en engelsk mening för att testa klassificeringsmodellen:</p>
+                <textarea id="inputText" placeholder="Skriv din engelska mening här..."></textarea>
+                <div class="button-container">
+                    <button id="analyzeBtn">Analysera mening</button>
+                    <button id="clearBtn">Rensa</button>
+                </div>
+            </div>
+            
+            <div class="results-section">
+                <h2>Resultat</h2>
+                <div class="results-container">
+                    <div class="result-box">
+                        <div class="result-title">
+                            <i>📊</i> Sannolikhet för positiv klassificering
+                        </div>
+                        <div class="probability-display">
+                            <div class="probability-value" id="probabilityValue">0.00</div>
+                            <div>Konfidensnivå</div>
+                        </div>
+                        <div class="probability-bar">
+                            <div class="probability-fill" id="probabilityBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="result-box">
+                        <div class="result-title">
+                            <i>🔤</i> Tokeniserade ord
+                        </div>
+                        <p>Orden som identifierats och omvandlats till tokens:</p>
+                        <div class="tokens-container" id="tokensContainer">
+                            <div class="token">Ingen mening analyserad än</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="status-section">
+                <h2>Status</h2>
+                <div id="status">Modellen är redo. Skriv en mening och klicka på "Analysera mening".</div>
+            </div>
+        </div>
+    </div>
+    
+    <footer>
+        <p>TensorFlow.js Modell för Textklassificering | Laddas upp på GitHub</p>
+        <p>Modell: Sequential med Embedding, GlobalAveragePooling1D, Dense(32), Dropout(0.2), Dense(1)</p>
+    </footer>
+
+    <script>
+        // Globala variabler
+        let model = null;
+        const VOCAB_SIZE = 8000;
+        const MAX_LEN = 30;
+        
+        // DOM-element
+        const inputText = document.getElementById('inputText');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const probabilityValue = document.getElementById('probabilityValue');
+        const probabilityBar = document.getElementById('probabilityBar');
+        const tokensContainer = document.getElementById('tokensContainer');
+        const status = document.getElementById('status');
+        
+        // Exempelordbok (i verkligheten skulle du använda samma ordbok som träningsmodellen)
+        // Detta är en förenklad version för demonstration
+        const sampleVocabulary = {
+            "good": 10, "bad": 20, "excellent": 30, "poor": 40, "happy": 50,
+            "sad": 60, "love": 70, "hate": 80, "like": 90, "dislike": 100,
+            "great": 110, "terrible": 120, "wonderful": 130, "awful": 140,
+            "beautiful": 150, "ugly": 160, "smart": 170, "stupid": 180,
+            "fast": 190, "slow": 200, "easy": 210, "hard": 220,
+            "the": 1, "and": 2, "is": 3, "in": 4, "to": 5, "of": 6,
+            "a": 7, "that": 8, "it": 9, "with": 10, "for": 11, "on": 12
+        };
+        
+        // Funktion för att ladda modellen
+        async function loadModel() {
+            try {
+                updateStatus('Laddar TensorFlow.js-modellen...', true);
+                
+                // Försök ladda modellen från model.json-filen
+                model = await tf.loadLayersModel('model.json');
+                
+                // Om modellen inte kan laddas från fil, skapa en testmodell med samma arkitektur
+                if (!model) {
+                    updateStatus('Kunde inte ladda modellen från fil. Skapar en testmodell...', true);
+                    model = createTestModel();
+                }
+                
+                updateStatus('Modellen har laddats! Skriv en mening för att testa.');
+                analyzeBtn.disabled = false;
+                console.log('Modell laddad:', model);
+            } catch (error) {
+                console.error('Fel vid laddning av modell:', error);
+                updateStatus('Fel vid laddning av modell. Skapar en testmodell...', true);
+                
+                // Skapa en testmodell med samma arkitektur för demonstration
+                model = createTestModel();
+                updateStatus('Testmodell skapad! Du kan nu testa med egna meningar.');
+                analyzeBtn.disabled = false;
+            }
+        }
+        
+        // Skapa en testmodell med samma arkitektur för demonstration
+        function createTestModel() {
+            const testModel = tf.sequential();
+            
+            // Embedding-lagret
+            testModel.add(tf.layers.embedding({
+                inputDim: VOCAB_SIZE,
+                outputDim: 64,
+                inputLength: MAX_LEN
+            }));
+            
+            // GlobalAveragePooling1D
+            testModel.add(tf.layers.globalAveragePooling1d());
+            
+            // Dense-lagret med 32 neuroner och ReLU-aktivering
+            testModel.add(tf.layers.dense({
+                units: 32,
+                activation: 'relu'
+            }));
+            
+            // Dropout-lagret
+            testModel.add(tf.layers.dropout({rate: 0.2}));
+            
+            // Slutligt Dense-lager med 1 neuron och sigmoid-aktivering
+            testModel.add(tf.layers.dense({
+                units: 1,
+                activation: 'sigmoid'
+            }));
+            
+            // Kompilera modellen
+            testModel.compile({
+                optimizer: tf.train.adam(0.001),
+                loss: 'binaryCrossentropy',
+                metrics: ['accuracy']
+            });
+            
+            return testModel;
+        }
+        
+        // Enkel tokenisering för demonstration
+        function tokenizeText(text) {
+            // Konvertera till små bokstäver och dela upp i ord
+            const words = text.toLowerCase()
+                .replace(/[^\w\s]/g, ' ')  // Ta bort skiljetecken
+                .split(/\s+/)               // Dela på mellanslag
+                .filter(word => word.length > 0);  // Ta bort tomma strängar
+            
+            // Skapa token-ID:n baserat på ordboken
+            const tokens = words.map(word => {
+                // Om ordet finns i ordboken, använd dess token-ID
+                if (sampleVocabulary[word] !== undefined) {
+                    return {
+                        word: word,
+                        tokenId: sampleVocabulary[word],
+                        inVocab: true
+                    };
+                } else {
+                    // Annars, generera ett hash-baserat token-ID inom VOCAB_SIZE
+                    let hash = 0;
+                    for (let i = 0; i < word.length; i++) {
+                        hash = (hash * 31 + word.charCodeAt(i)) % VOCAB_SIZE;
+                    }
+                    return {
+                        word: word,
+                        tokenId: hash + 1, // +1 för att undvika 0
+                        inVocab: false
+                    };
+                }
+            });
+            
+            return tokens;
+        }
+        
+        // Förbered indata för modellen
+        function prepareInput(tokens) {
+            // Skapa en array med token-ID:n
+            const tokenIds = tokens.map(token => token.tokenId);
+            
+            // Begränsa till MAX_LEN tokens
+            const paddedTokens = [];
+            for (let i = 0; i < MAX_LEN; i++) {
+                paddedTokens.push(i < tokenIds.length ? tokenIds[i] : 0);
+            }
+            
+            // Skapa en tensor
+            return tf.tensor2d([paddedTokens], [1, MAX_LEN], 'int32');
+        }
+        
+        // Analysera texten
+        async function analyzeText() {
+            const text = inputText.value.trim();
+            
+            if (!text) {
+                updateStatus('Vänligen skriv en mening för att analysera.');
+                return;
+            }
+            
+            if (!model) {
+                updateStatus('Modellen laddas fortfarande. Vänta ett ögonblick.');
+                return;
+            }
+            
+            updateStatus('Analyserar mening...', true);
+            analyzeBtn.disabled = true;
+            
+            try {
+                // Tokenisera texten
+                const tokens = tokenizeText(text);
+                
+                // Visa tokens
+                displayTokens(tokens);
+                
+                // Förbered indata för modellen
+                const inputTensor = prepareInput(tokens);
+                
+                // Gör förutsägelse
+                const prediction = model.predict(inputTensor);
+                const probability = (await prediction.data())[0];
+                
+                // Visa resultatet
+                displayResult(probability);
+                
+                // Rensa tensorer
+                inputTensor.dispose();
+                prediction.dispose();
+                
+                updateStatus(`Analys klar! Sannolikhet: ${(probability * 100).toFixed(2)}%`);
+            } catch (error) {
+                console.error('Fel vid analys:', error);
+                updateStatus('Ett fel uppstod vid analysen. Försök igen.');
+                
+                // För demonstration: visa ett slumpmässigt resultat om modellen inte fungerar
+                if (model && model.layers && model.layers.length > 0) {
+                    const mockProbability = Math.random();
+                    displayResult(mockProbability);
+                    updateStatus(`Demonstrationsresultat: ${(mockProbability * 100).toFixed(2)}% (mock data)`);
+                }
+            } finally {
+                analyzeBtn.disabled = false;
+            }
+        }
+        
+        // Visa tokens
+        function displayTokens(tokens) {
+            tokensContainer.innerHTML = '';
+            
+            if (tokens.length === 0) {
+                tokensContainer.innerHTML = '<div class="token">Inga ord identifierade</div>';
+                return;
+            }
+            
+            tokens.forEach(token => {
+                const tokenElement = document.createElement('div');
+                tokenElement.className = 'token';
+                
+                let className = 'token';
+                if (!token.inVocab) {
+                    className += ' unknown';
+                }
+                
+                tokenElement.innerHTML = `
+                    ${token.word}
+                    <span class="token-index">(token: ${token.tokenId})</span>
+                `;
+                
+                tokensContainer.appendChild(tokenElement);
+            });
+        }
+        
+        // Visa resultat
+        function displayResult(probability) {
+            // Visa sannolikhet som procent
+            const percentage = (probability * 100).toFixed(2);
+            probabilityValue.textContent = `${percentage}%`;
+            
+            // Uppdatera färgen baserat på sannolikhet
+            let color;
+            if (probability < 0.3) {
+                color = '#f46b45'; // Röd-orange för låg sannolikhet
+            } else if (probability < 0.7) {
+                color = '#eea849'; // Gul för medium sannolikhet
+            } else {
+                color = '#3a7bd5'; // Blå för hög sannolikhet
+            }
+            
+            probabilityValue.style.color = color;
+            
+            // Uppdatera fyllnadsfärgen för stapeln
+            probabilityBar.style.background = `linear-gradient(to right, ${color}, ${color}99)`;
+            
+            // Animerar stapeln
+            setTimeout(() => {
+                probabilityBar.style.width = `${percentage}%`;
+            }, 100);
+        }
+        
+        // Uppdatera statusmeddelande
+        function updateStatus(message, loading = false) {
+            if (loading) {
+                status.innerHTML = `
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <span>${message}</span>
+                    </div>
+                `;
+            } else {
+                status.textContent = message;
+            }
+        }
+        
+        // Rensa allt
+        function clearAll() {
+            inputText.value = '';
+            probabilityValue.textContent = '0.00';
+            probabilityValue.style.color = '#3a7bd5';
+            probabilityBar.style.width = '0%';
+            probabilityBar.style.background = 'linear-gradient(to right, #3a7bd5, #00d2ff)';
+            tokensContainer.innerHTML = '<div class="token">Ingen mening analyserad än</div>';
+            updateStatus('Modellen är redo. Skriv en mening och klicka på "Analysera mening".');
+        }
+        
+        // Initiera sidan
+        document.addEventListener('DOMContentLoaded', () => {
+            // Ladda modellen
+            loadModel();
+            
+            // Lägg till händelsehanterare
+            analyzeBtn.addEventListener('click', analyzeText);
+            clearBtn.addEventListener('click', clearAll);
+            
+            // Analysera med Enter-tangenten (Shift+Enter för ny rad)
+            inputText.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    analyzeText();
+                }
+            });
+            
+            // Visa exempelmeningar
+            const examples = [
+                "This is a good product",
+                "I had a terrible experience",
+                "The service was excellent and fast",
+                "I dislike the poor quality of this item"
+            ];
+            
+            // Välj ett slumpmässigt exempel
+            const randomExample = examples[Math.floor(Math.random() * examples.length)];
+            inputText.placeholder = `T.ex: "${randomExample}"`;
+        });
+    </script>
+</body>
+</html>
