@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spam Detector</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        
+        .input-container {
+            margin-bottom: 30px;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 150px;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+            resize: vertical;
+            transition: border-color 0.3s;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .button-container {
+            margin-bottom: 30px;
+        }
+        
+        button {
+            background: linear-gradient(to right, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+            font-weight: 600;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+        
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .result-container {
+            margin-top: 30px;
+            padding: 25px;
+            border-radius: 15px;
+            background-color: #f8f9fa;
+            display: none;
+        }
+        
+        .result-title {
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .probability-display {
+            font-size: 2.8em;
+            font-weight: 700;
+            margin: 20px 0;
+        }
+        
+        .spam-indicator {
+            height: 20px;
+            background-color: #eee;
+            border-radius: 10px;
+            margin: 20px 0;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .spam-fill {
+            height: 100%;
+            border-radius: 10px;
+            width: 0%;
+            transition: width 1s ease-in-out;
+        }
+        
+        .labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            color: #666;
+            font-weight: 600;
+        }
+        
+        .message {
+            font-size: 1.2em;
+            font-weight: 600;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        
+        .ham {
+            color: #27ae60;
+            background-color: rgba(39, 174, 96, 0.1);
+        }
+        
+        .spam {
+            color: #e74c3c;
+            background-color: rgba(231, 76, 60, 0.1);
+        }
+        
+        .loading {
+            display: none;
+            margin: 20px 0;
+        }
+        
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .status {
+            margin-top: 10px;
+            color: #666;
+        }
+        
+        .info {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #777;
+            font-size: 0.9em;
+            text-align: left;
+        }
+        
+        .info h3 {
+            margin-bottom: 10px;
+            color: #555;
+        }
+        
+        .info ul {
+            padding-left: 20px;
+        }
+        
+        .info li {
+            margin-bottom: 5px;
+        }
+        
+        footer {
+            margin-top: 30px;
+            color: #888;
+            font-size: 0.8em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📩 Spam Detector</h1>
+        <p class="subtitle">Enter an English sentence to check if it's spam or ham</p>
+        
+        <div class="input-container">
+            <textarea id="textInput" placeholder="Enter your message here..."></textarea>
+        </div>
+        
+        <div class="button-container">
+            <button id="checkBtn">Check for Spam</button>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="loader"></div>
+            <p class="status">Analyzing text...</p>
+        </div>
+        
+        <div class="result-container" id="resultContainer">
+            <div class="result-title">Spam Probability</div>
+            
+            <div class="probability-display" id="probabilityDisplay">0%</div>
+            
+            <div class="spam-indicator">
+                <div class="spam-fill" id="spamFill"></div>
+            </div>
+            
+            <div class="labels">
+                <span>HAM (0%)</span>
+                <span>SPAM (100%)</span>
+            </div>
+            
+            <div class="message" id="messageDisplay">The message is HAM</div>
+        </div>
+        
+        <div class="info">
+            <h3>About this spam detector:</h3>
+            <ul>
+                <li>Uses a neural network with embedding layer and dense layers</li>
+                <li>Model trained on English text data</li>
+                <li>Output is a probability between 0 (ham) and 1 (spam)</li>
+                <li>Threshold for spam classification: ≥ 0.5 (50%)</li>
+            </ul>
+        </div>
+        
+        <footer>
+            Model: Sequential with Embedding(8000,64) → GlobalAveragePooling1D → Dense(32) → Dropout(0.2) → Dense(1)
+        </footer>
+    </div>
+
+    <script>
+        // DOM Elements
+        const textInput = document.getElementById('textInput');
+        const checkBtn = document.getElementById('checkBtn');
+        const loading = document.getElementById('loading');
+        const resultContainer = document.getElementById('resultContainer');
+        const probabilityDisplay = document.getElementById('probabilityDisplay');
+        const spamFill = document.getElementById('spamFill');
+        const messageDisplay = document.getElementById('messageDisplay');
+        
+        // Model and tokenizer variables
+        let model = null;
+        let tokenizer = null;
+        const VOCAB_SIZE = 8000;
+        const MAX_LENGTH = 30;
+        
+        // Simple tokenizer function (you should replace this with your actual tokenizer)
+        function createTokenizer(vocabSize) {
+            return {
+                texts_to_sequences: function(texts) {
+                    // This is a simplified tokenizer - in production you should use 
+                    // the same tokenizer that was used during training
+                    return texts.map(text => {
+                        const tokens = text.toLowerCase()
+                            .replace(/[^\w\s]/g, ' ')
+                            .split(/\s+/)
+                            .filter(word => word.length > 0);
+                        
+                        // Convert words to hash indices (simple hash function)
+                        const sequences = tokens.map(word => {
+                            let hash = 0;
+                            for (let i = 0; i < word.length; i++) {
+                                hash = ((hash << 5) - hash) + word.charCodeAt(i);
+                                hash = hash & hash; // Convert to 32-bit integer
+                            }
+                            return Math.abs(hash) % (vocabSize - 1) + 1;
+                        });
+                        
+                        // Pad or truncate to MAX_LENGTH
+                        if (sequences.length > MAX_LENGTH) {
+                            return sequences.slice(0, MAX_LENGTH);
+                        } else {
+                            const padded = [...sequences];
+                            while (padded.length < MAX_LENGTH) {
+                                padded.push(0);
+                            }
+                            return padded;
+                        }
+                    });
+                }
+            };
+        }
+        
+        // Initialize the model
+        async function initModel() {
+            try {
+                console.log('Loading model...');
+                model = await tf.loadLayersModel('model.json');
+                tokenizer = createTokenizer(VOCAB_SIZE);
+                console.log('Model loaded successfully');
+                checkBtn.disabled = false;
+                checkBtn.textContent = 'Check for Spam';
+            } catch (error) {
+                console.error('Error loading model:', error);
+                alert('Error loading model. Please check if model.json is in the correct directory.');
+            }
+        }
+        
+        // Preprocess text for the model
+        function preprocessText(text) {
+            const sequences = tokenizer.texts_to_sequences([text]);
+            return tf.tensor2d(sequences, [1, MAX_LENGTH], 'int32');
+        }
+        
+        // Check if text is spam
+        async function checkSpam() {
+            const text = textInput.value.trim();
+            
+            if (!text) {
+                alert('Please enter some text to analyze');
+                return;
+            }
+            
+            if (!model) {
+                alert('Model is still loading. Please wait...');
+                return;
+            }
+            
+            // Show loading, hide results
+            loading.style.display = 'block';
+            resultContainer.style.display = 'none';
+            checkBtn.disabled = true;
+            checkBtn.textContent = 'Processing...';
+            
+            try {
+                // Preprocess the text
+                const inputTensor = preprocessText(text);
+                
+                // Make prediction
+                const prediction = model.predict(inputTensor);
+                const probability = (await prediction.data())[0];
+                
+                // Clean up tensors to prevent memory leaks
+                inputTensor.dispose();
+                prediction.dispose();
+                
+                // Display results
+                displayResults(probability);
+                
+            } catch (error) {
+                console.error('Error during prediction:', error);
+                alert('Error analyzing text. Please try again.');
+            } finally {
+                // Hide loading, enable button
+                loading.style.display = 'none';
+                checkBtn.disabled = false;
+                checkBtn.textContent = 'Check for Spam';
+            }
+        }
+        
+        // Display the results
+        function displayResults(probability) {
+            // Convert probability to percentage
+            const percentage = (probability * 100).toFixed(1);
+            
+            // Update probability display
+            probabilityDisplay.textContent = `${percentage}%`;
+            
+            // Update fill bar
+            spamFill.style.width = `${percentage}%`;
+            
+            // Update colors based on probability
+            let isSpam = probability >= 0.5;
+            
+            if (isSpam) {
+                probabilityDisplay.style.color = '#e74c3c';
+                spamFill.style.background = 'linear-gradient(to right, #ff7e5f, #feb47b)';
+                messageDisplay.textContent = `🚨 This message is SPAM (${percentage}% probability)`;
+                messageDisplay.className = 'message spam';
+            } else {
+                probabilityDisplay.style.color = '#27ae60';
+                spamFill.style.background = 'linear-gradient(to right, #56ab2f, #a8e063)';
+                messageDisplay.textContent = `✅ This message is HAM (${(100 - percentage).toFixed(1)}% probability)`;
+                messageDisplay.className = 'message ham';
+            }
+            
+            // Show result container
+            resultContainer.style.display = 'block';
+            
+            // Scroll to results
+            resultContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        
+        // Event listeners
+        checkBtn.addEventListener('click', checkSpam);
+        
+        // Check for Enter key in textarea (but don't submit, just add newline)
+        textInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                checkSpam();
+            }
+        });
+        
+        // Example texts for quick testing
+        function insertExample(text) {
+            textInput.value = text;
+        }
+        
+        // Add example buttons dynamically
+        window.addEventListener('DOMContentLoaded', () => {
+            const examples = [
+                "Congratulations! You've won a free iPhone. Click here to claim your prize now!",
+                "Hey, are we still meeting for lunch tomorrow at 12?",
+                "URGENT: Your bank account has been compromised. Verify your details immediately.",
+                "Thanks for sending the report. I'll review it and get back to you by Friday.",
+                "EARN $5000 PER WEEK FROM HOME!!! No experience needed. Start today!"
+            ];
+            
+            const exampleContainer = document.createElement('div');
+            exampleContainer.style.marginTop = '15px';
+            exampleContainer.style.textAlign = 'left';
+            
+            const exampleTitle = document.createElement('div');
+            exampleTitle.textContent = 'Try these examples:';
+            exampleTitle.style.fontSize = '14px';
+            exampleTitle.style.color = '#666';
+            exampleTitle.style.marginBottom = '8px';
+            exampleTitle.style.fontWeight = '600';
+            
+            exampleContainer.appendChild(exampleTitle);
+            
+            examples.forEach(example => {
+                const button = document.createElement('button');
+                button.textContent = example.substring(0, 40) + '...';
+                button.style.background = 'none';
+                button.style.color = '#667eea';
+                button.style.border = '1px solid #667eea';
+                button.style.padding = '5px 10px';
+                button.style.margin = '3px';
+                button.style.borderRadius = '15px';
+                button.style.fontSize = '12px';
+                button.style.cursor = 'pointer';
+                button.style.transition = 'all 0.2s';
+                
+                button.addEventListener('mouseenter', () => {
+                    button.style.background = '#667eea';
+                    button.style.color = 'white';
+                });
+                
+                button.addEventListener('mouseleave', () => {
+                    button.style.background = 'none';
+                    button.style.color = '#667eea';
+                });
+                
+                button.addEventListener('click', () => {
+                    insertExample(example);
+                });
+                
+                exampleContainer.appendChild(button);
+            });
+            
+            textInput.parentNode.insertBefore(exampleContainer, textInput.nextSibling);
+        });
+        
+        // Initialize the model when page loads
+        initModel();
+    </script>
+</body>
+</html>
