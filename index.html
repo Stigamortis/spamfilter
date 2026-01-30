@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spam Detector</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            width: 100%;
+            max-width: 700px;
+            text-align: center;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        
+        .input-container {
+            margin-bottom: 30px;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 150px;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+            resize: vertical;
+            transition: border-color 0.3s;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .button-container {
+            margin-bottom: 30px;
+        }
+        
+        button {
+            background: linear-gradient(to right, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+            font-weight: 600;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+        
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .result-container {
+            margin-top: 30px;
+            padding: 25px;
+            border-radius: 15px;
+            background-color: #f8f9fa;
+            display: none;
+        }
+        
+        .result-title {
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .probability-display {
+            font-size: 2.8em;
+            font-weight: 700;
+            margin: 20px 0;
+        }
+        
+        .spam-indicator {
+            height: 20px;
+            background-color: #eee;
+            border-radius: 10px;
+            margin: 20px 0;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .spam-fill {
+            height: 100%;
+            border-radius: 10px;
+            width: 0%;
+            transition: width 1s ease-in-out;
+        }
+        
+        .labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            color: #666;
+            font-weight: 600;
+        }
+        
+        .message {
+            font-size: 1.2em;
+            font-weight: 600;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        
+        .ham {
+            color: #27ae60;
+            background-color: rgba(39, 174, 96, 0.1);
+        }
+        
+        .spam {
+            color: #e74c3c;
+            background-color: rgba(231, 76, 60, 0.1);
+        }
+        
+        .loading {
+            display: none;
+            margin: 20px 0;
+        }
+        
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .status {
+            margin-top: 10px;
+            color: #666;
+        }
+        
+        .info {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 10px;
+            background-color: #f0f7ff;
+            border-left: 4px solid #667eea;
+            text-align: left;
+        }
+        
+        .info h3 {
+            margin-bottom: 10px;
+            color: #555;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .info ul {
+            padding-left: 20px;
+        }
+        
+        .info li {
+            margin-bottom: 8px;
+            color: #444;
+        }
+        
+        footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 0.85em;
+            text-align: left;
+        }
+        
+        .model-status {
+            padding: 12px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: 600;
+            display: none;
+        }
+        
+        .model-loading {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .model-ready {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            animation: pulse 2s infinite;
+        }
+        
+        .model-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; }
+            100% { opacity: 1; }
+        }
+        
+        .metadata-info {
+            background-color: #e8f5e9;
+            border: 1px solid #c8e6c9;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            text-align: left;
+            font-size: 0.9em;
+        }
+        
+        .metadata-info h4 {
+            color: #2e7d32;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .metadata-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .metadata-item {
+            padding: 8px;
+            background: white;
+            border-radius: 5px;
+            border-left: 3px solid #4caf50;
+        }
+        
+        .metadata-label {
+            font-weight: 600;
+            color: #555;
+            font-size: 0.85em;
+        }
+        
+        .metadata-value {
+            color: #333;
+            margin-top: 3px;
+        }
+        
+        .example-btn {
+            background: none;
+            color: #667eea;
+            border: 1px solid #667eea;
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+            flex: 1 0 auto;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .example-btn:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+        }
+        
+        .confidence-meter {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin: 15px 0;
+        }
+        
+        .confidence-label {
+            font-size: 0.9em;
+            color: #666;
+            font-weight: 600;
+            min-width: 80px;
+        }
+        
+        .confidence-bar {
+            flex-grow: 1;
+            height: 10px;
+            background: #eee;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 1s ease-in-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📩 Spam Detector</h1>
+        <p class="subtitle">Enter an English sentence to check if it's spam or ham</p>
+        
+        <div id="modelStatus" class="model-status model-loading">
+            ⏳ Loading model and metadata from tfjs_model/ folder...
+        </div>
+        
+        <div class="input-container">
+            <textarea id="textInput" placeholder="Enter your message here..."></textarea>
+        </div>
+        
+        <div id="exampleContainer" style="margin-bottom: 20px; text-align: left;">
+            <div style="font-size: 14px; color: #666; margin-bottom: 8px; font-weight: 600;">
+                Try these examples:
+            </div>
+            <div id="exampleButtons" style="display: flex; flex-wrap: wrap; gap: 5px;"></div>
+        </div>
+        
+        <div class="button-container">
+            <button id="checkBtn" disabled>Check for Spam</button>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="loader"></div>
+            <p class="status">Analyzing text...</p>
+        </div>
+        
+        <div class="result-container" id="resultContainer">
+            <div class="result-title">Spam Probability Analysis</div>
+            
+            <div class="probability-display" id="probabilityDisplay">0%</div>
+            
+            <div class="spam-indicator">
+                <div class="spam-fill" id="spamFill"></div>
+            </div>
+            
+            <div class="labels">
+                <span>HAM (0%)</span>
+                <span>SPAM (100%)</span>
+            </div>
+            
+            <div class="message" id="messageDisplay">The message is HAM</div>
+            
+            <div class="confidence-meter">
+                <div class="confidence-label">Confidence:</div>
+                <div class="confidence-bar">
+                    <div class="confidence-fill" id="confidenceFill"></div>
+                </div>
+                <div id="confidenceValue" style="min-width: 40px; font-weight: 600;">0%</div>
+            </div>
+            
+            <div id="metadataDisplay" class="metadata-info" style="display: none;">
+                <h4>📊 Model Information</h4>
+                <div id="metadataContent"></div>
+            </div>
+        </div>
+        
+        <div class="info">
+            <h3>📋 About this spam detector:</h3>
+            <ul>
+                <li>Uses a neural network with embedding layer and dense layers</li>
+                <li>Model trained on English text data</li>
+                <li>Output is a probability between 0 (ham) and 1 (spam)</li>
+                <li>Threshold for spam classification: ≥ 0.5 (50%)</li>
+                <li>Model loaded from: <code>tfjs_model/</code> folder</li>
+                <li>Includes metadata for model information</li>
+            </ul>
+        </div>
+        
+        <footer>
+            <div><strong>Model Architecture:</strong> Embedding(8000,64) → GlobalAveragePooling1D → Dense(32) → Dropout(0.2) → Dense(1)</div>
+            <div style="margin-top: 5px;"><strong>Files loaded:</strong> model.json, group1-shard1of1.bin, metadata.json</div>
+        </footer>
+    </div>
+
+    <script>
+        // DOM Elements
+        const textInput = document.getElementById('textInput');
+        const checkBtn = document.getElementById('checkBtn');
+        const loading = document.getElementById('loading');
+        const resultContainer = document.getElementById('resultContainer');
+        const probabilityDisplay = document.getElementById('probabilityDisplay');
+        const spamFill = document.getElementById('spamFill');
+        const messageDisplay = document.getElementById('messageDisplay');
+        const modelStatus = document.getElementById('modelStatus');
+        const exampleButtons = document.getElementById('exampleButtons');
+        const confidenceFill = document.getElementById('confidenceFill');
+        const confidenceValue = document.getElementById('confidenceValue');
+        const metadataDisplay = document.getElementById('metadataDisplay');
+        const metadataContent = document.getElementById('metadataContent');
+        
+        // Global variables
+        let model = null;
+        let tokenizer = null;
+        let metadata = null;
+        let wordIndex = null;
+        const VOCAB_SIZE = 8000;
+        const MAX_LENGTH = 30;
+        const MODEL_PATH = 'tfjs_model/model.json';
+        const METADATA_PATH = 'tfjs_model/metadata.json';
+        
+        // Initialize everything
+        async function init() {
+            try {
+                updateModelStatus('loading', 'Loading model and metadata...');
+                
+                // Load model and metadata in parallel
+                const [loadedModel, loadedMetadata] = await Promise.all([
+                    loadModel(),
+                    loadMetadata()
+                ]);
+                
+                model = loadedModel;
+                metadata = loadedMetadata;
+                
+                // Initialize tokenizer based on metadata
+                initTokenizer();
+                
+                // Setup examples based on metadata
+                setupExamples();
+                
+                // Display metadata
+                displayMetadata();
+                
+                updateModelStatus('ready', 'Model and metadata loaded successfully!');
+                checkBtn.disabled = false;
+                checkBtn.textContent = 'Check for Spam';
+                
+                // Test model
+                await testModel();
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                updateModelStatus('error', `Error: ${error.message}`);
+                checkBtn.disabled = true;
+                checkBtn.textContent = 'Initialization Failed';
+            }
+        }
+        
+        // Load model
+        async function loadModel() {
+            console.log('Loading model from:', MODEL_PATH);
+            const loadedModel = await tf.loadLayersModel(MODEL_PATH);
+            console.log('Model loaded successfully');
+            
+            // Log model summary
+            console.log('Model summary:');
+            loadedModel.summary();
+            
+            return loadedModel;
+        }
+        
+        // Load metadata
+        async function loadMetadata() {
+            console.log('Loading metadata from:', METADATA_PATH);
+            const response = await fetch(METADATA_PATH);
+            
+            if (!response.ok) {
+                throw new Error(`Failed to load metadata: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('Metadata loaded:', data);
+            
+            // Extract word index if available
+            if (data.word_index) {
+                wordIndex = data.word_index;
+                console.log(`Word index loaded with ${Object.keys(wordIndex).length} words`);
+            }
+            
+            return data;
+        }
+        
+        // Initialize tokenizer
+        function initTokenizer() {
+            if (wordIndex) {
+                // Use actual word index from metadata
+                console.log('Using word index from metadata for tokenization');
+                tokenizer = {
+                    texts_to_sequences: function(texts) {
+                        return texts.map(text => {
+                            const tokens = text.toLowerCase()
+                                .replace(/[^\w\s]/g, ' ')
+                                .replace(/\s+/g, ' ')
+                                .trim()
+                                .split(' ')
+                                .filter(word => word.length > 0);
+                            
+                            const sequences = tokens.map(word => {
+                                return wordIndex[word] || 1; // Use 1 for unknown words
+                            });
+                            
+                            // Pad or truncate
+                            if (sequences.length > MAX_LENGTH) {
+                                return sequences.slice(0, MAX_LENGTH);
+                            } else {
+                                const padded = [...sequences];
+                                while (padded.length < MAX_LENGTH) {
+                                    padded.push(0);
+                                }
+                                return padded;
+                            }
+                        });
+                    }
+                };
+            } else {
+                // Fallback to hash-based tokenizer
+                console.log('Using hash-based tokenizer (no word index found)');
+                tokenizer = createTokenizer(VOCAB_SIZE);
+            }
+        }
+        
+        // Hash-based tokenizer (fallback)
+        function createTokenizer(vocabSize) {
+            return {
+                texts_to_sequences: function(texts) {
+                    return texts.map(text => {
+                        const tokens = text.toLowerCase()
+                            .replace(/[^\w\s]/g, ' ')
+                            .replace(/\s+/g, ' ')
+                            .trim()
+                            .split(' ')
+                            .filter(word => word.length > 0);
+                        
+                        const sequences = tokens.map(word => {
+                            let hash = 2166136261;
+                            for (let i = 0; i < word.length; i++) {
+                                hash ^= word.charCodeAt(i);
+                                hash *= 16777619;
+                                hash &= 0xFFFFFFFF;
+                            }
+                            return Math.abs(hash) % (vocabSize - 1) + 1;
+                        });
+                        
+                        if (sequences.length > MAX_LENGTH) {
+                            return sequences.slice(0, MAX_LENGTH);
+                        } else {
+                            const padded = [...sequences];
+                            while (padded.length < MAX_LENGTH) {
+                                padded.push(0);
+                            }
+                            return padded;
+                        }
+                    });
+                }
+            };
+        }
+        
+        // Setup example buttons
+        function setupExamples() {
+            const examples = metadata?.examples || [
+                "Congratulations! You've won a free iPhone. Click here to claim your prize now!",
+                "Hey, are we still meeting for lunch tomorrow at 12?",
+                "URGENT: Your bank account has been compromised. Verify your details immediately.",
+                "Thanks for sending the report. I'll review it and get back to you by Friday.",
+                "EARN $5000 PER WEEK FROM HOME!!! No experience needed. Start today!",
+                "Hello, just checking in to see how you're doing. Let's catch up soon.",
+                "WINNER! You have been selected for a $1000 Walmart Gift Card. Claim now!"
+            ];
+            
+            examples.forEach(example => {
+                const button = document.createElement('button');
+                button.className = 'example-btn';
+                button.textContent = example.substring(0, 35) + (example.length > 35 ? '...' : '');
+                button.title = example;
+                
+                button.addEventListener('click', () => {
+                    textInput.value = example;
+                    textInput.focus();
+                });
+                
+                exampleButtons.appendChild(button);
+            });
+        }
+        
+        // Display metadata
+        function displayMetadata() {
+            if (!metadata) return;
+            
+            let html = '<div class="metadata-grid">';
+            
+            // Model info
+            if (metadata.model_info) {
+                Object.entries(metadata.model_info).forEach(([key, value]) => {
+                    html += `
+                        <div class="metadata-item">
+                            <div class="metadata-label">${key.replace(/_/g, ' ')}</div>
+                            <div class="metadata-value">${value}</div>
+                        </div>
+                    `;
+                });
+            }
+            
+            // Training info
+            if (metadata.training_info) {
+                Object.entries(metadata.training_info).forEach(([key, value]) => {
+                    html += `
+                        <div class="metadata-item">
+                            <div class="metadata-label">${key.replace(/_/g, ' ')}</div>
+                            <div class="metadata-value">${value}</div>
+                        </div>
+                    `;
+                });
+            }
+            
+            // Dataset info
+            if (metadata.dataset_info) {
+                Object.entries(metadata.dataset_info).forEach(([key, value]) => {
+                    html += `
+                        <div class="metadata-item">
+                            <div class="metadata-label">${key.replace(/_/g, ' ')}</div>
+                            <div class="metadata-value">${value}</div>
+                        </div>
+                    `;
+                });
+            }
+            
+            // Performance metrics
+            if (metadata.performance) {
+                Object.entries(metadata.performance).forEach(([key, value]) => {
+                    html += `
+                        <div class="metadata-item">
+                            <div class="metadata-label">${key}</div>
+                            <div class="metadata-value">${typeof value === 'number' ? value.toFixed(4) : value}</div>
+                        </div>
+                    `;
+                });
+            }
+            
+            html += '</div>';
+            metadataContent.innerHTML = html;
+            metadataDisplay.style.display = 'block';
+        }
+        
+        // Test model with dummy input
+        async function testModel() {
+            try {
+                const testInput = tf.ones([1, MAX_LENGTH], 'int32');
+                const testOutput = model.predict(testInput);
+                const testValue = (await testOutput.data())[0];
+                
+                testInput.dispose();
+                testOutput.dispose();
+                
+                console.log('Model test successful, output:', testValue);
+                return true;
+            } catch (error) {
+                console.warn('Model test failed:', error);
+                return false;
+            }
+        }
+        
+        // Update model status
+        function updateModelStatus(status, message) {
+            modelStatus.style.display = 'block';
+            modelStatus.className = 'model-status';
+            
+            if (status === 'loading') {
+                modelStatus.classList.add('model-loading');
+                modelStatus.innerHTML = '⏳ ' + message;
+            } else if (status === 'ready') {
+                modelStatus.classList.add('model-ready');
+                modelStatus.innerHTML = '✅ ' + message;
+                setTimeout(() => {
+                    modelStatus.style.display = 'none';
+                }, 4000);
+            } else if (status === 'error') {
+                modelStatus.classList.add('model-error');
+                modelStatus.innerHTML = '❌ ' + message;
+            }
+        }
+        
+        // Preprocess text
+        function preprocessText(text) {
+            console.log('Original text:', text);
+            const sequences = tokenizer.texts_to_sequences([text]);
+            console.log('Tokenized sequence (first 10):', sequences[0].slice(0, 10));
+            
+            const nonZeroTokens = sequences[0].filter(token => token !== 0).length;
+            console.log(`Tokens: ${nonZeroTokens}/${MAX_LENGTH} (${Math.round(nonZeroTokens/MAX_LENGTH*100)}% filled)`);
+            
+            return tf.tensor2d(sequences, [1, MAX_LENGTH], 'int32');
+        }
+        
+        // Check spam
+        async function checkSpam() {
+            const text = textInput.value.trim();
+            
+            if (!text) {
+                alert('Please enter some text to analyze');
+                return;
+            }
+            
+            if (!model) {
+                updateModelStatus('error', 'Model not loaded. Please reload the page.');
+                return;
+            }
+            
+            // UI updates
+            loading.style.display = 'block';
+            resultContainer.style.display = 'none';
+            checkBtn.disabled = true;
+            checkBtn.textContent = 'Processing...';
+            
+            try {
+                console.log('\n=== Text Analysis ===');
+                console.log('Input:', text);
+                
+                // Preprocess and predict
+                const startTime = performance.now();
+                const inputTensor = preprocessText(text);
+                const prediction = model.predict(inputTensor);
+                const probability = (await prediction.data())[0];
+                const endTime = performance.now();
+                
+                console.log('Prediction:', probability);
+                console.log(`Processing time: ${(endTime - startTime).toFixed(2)}ms`);
+                
+                // Cleanup
+                inputTensor.dispose();
+                prediction.dispose();
+                
+                // Display results
+                displayResults(probability, text);
+                
+            } catch (error) {
+                console.error('Prediction error:', error);
+                alert('Error analyzing text. Please try again.');
+            } finally {
+                loading.style.display = 'none';
+                checkBtn.disabled = false;
+                checkBtn.textContent = 'Check for Spam';
+            }
+        }
+        
+        // Display results
+        function displayResults(probability, text) {
+            const percentage = (probability * 100).toFixed(1);
+            const isSpam = probability >= 0.5;
+            
+            // Calculate confidence (how far from threshold)
+            const confidence = Math.abs(probability - 0.5) * 2; // 0-1 scale
+            const confidencePercent = Math.min(95, Math.max(50, confidence * 100)).toFixed(0);
+            
+            // Update displays
+            probabilityDisplay.textContent = `${percentage}%`;
+            spamFill.style.width = `${percentage}%`;
+            
+            // Confidence display
+            confidenceFill.style.width = `${confidencePercent}%`;
+            confidenceValue.textContent = `${confidencePercent}%`;
+            
+            // Set colors based on result
+            if (isSpam) {
+                probabilityDisplay.style.color = '#e74c3c';
+                spamFill.style.background = 'linear-gradient(to right, #ff416c, #ff4b2b)';
+                confidenceFill.style.background = 'linear-gradient(to right, #ff7e5f, #feb47b)';
+                messageDisplay.textContent = `🚨 SPAM DETECTED! (${percentage}% probability)`;
+                messageDisplay.className = 'message spam';
+            } else {
+                probabilityDisplay.style.color = '#27ae60';
+                spamFill.style.background = 'linear-gradient(to right, #00b09b, #96c93d)';
+                confidenceFill.style.background = 'linear-gradient(to right, #56ab2f, #a8e063)';
+                messageDisplay.textContent = `✅ Legitimate message (${(100 - percentage).toFixed(1)}% probability)`;
+                messageDisplay.className = 'message ham';
+            }
+            
+            // Show results
+            resultContainer.style.display = 'block';
+            metadataDisplay.style.display = 'block';
+            
+            // Scroll to results
+            resultContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
+            // Log analysis
+            console.log(`Result: ${isSpam ? 'SPAM' : 'HAM'} (${percentage}%, confidence: ${confidencePercent}%)`);
+            
+            // Store result in metadata for tracking (optional)
+            if (metadata) {
+                metadata.last_analysis = {
+                    text: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
+                    probability: probability,
+                    is_spam: isSpam,
+                    timestamp: new Date().toISOString()
+                };
+            }
+        }
+        
+        // Event listeners
+        checkBtn.addEventListener('click', checkSpam);
+        textInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                e.preventDefault();
+                checkSpam();
+            }
+        });
+        
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
